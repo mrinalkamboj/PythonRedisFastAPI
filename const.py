@@ -18,6 +18,7 @@ valid_suffix = "_valid"
 lock_suffix = "_lock"
 rate_limit_suffix = "_rate_limit"
 current_executing_suffix = "_current_executing"
+all_banners_default_rate_limit = 4
 
 ## Query executing status
 starting = "starting"

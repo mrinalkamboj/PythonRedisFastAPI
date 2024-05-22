@@ -6,7 +6,7 @@ from fastapi import APIRouter,Query
 from redisfuncs import set_redis_key, get_redis_key, list_redis_keys, delete_redis_key, delete_all_redis_keys, acquire_redis_lock, release_redis_lock, incr_redis_key, decr_redis_key,async_redis_wrapper,set_redis_keys,generate_unique_tracking_id, get_hash_set,get_hash_set_key,get_hash_set_keys,set_hash_set,set_hash_set_keys
 
 ## Constants
-from const import lock_suffix,pending,executing,success,failed,retrial1,retrial2,starting,rate_limit_suffix,redis_lock_ttl_ms,current_executing_suffix
+from const import lock_suffix,pending,executing,success,failed,retrial1,retrial2,starting,rate_limit_suffix,redis_lock_ttl_ms,current_executing_suffix,all_banners_default_rate_limit
 
 ## Asyncio
 import asyncio
@@ -54,6 +54,10 @@ async def ada_visual_sf_execute(banner:str,tid:str,qid:str,status=starting):
     
     ## Fetch the Rate Limit Value
     rate_limit = await async_redis_wrapper(get_redis_key,banner+rate_limit_suffix)
+
+    ## set the default rate limit if not set
+    if not rate_limit:
+        rate_limit = all_banners_default_rate_limit
 
     current_executing = await async_redis_wrapper(get_redis_key,banner+current_executing_suffix)
 
@@ -110,21 +114,30 @@ async def main_task(banner:str,tid:str,qid:str,status):
         qs = str(qs.decode('utf-8'))
         if qs == executing:        
             await asyncio.create_task(main_task(banner,tid,qid,retrial1))
+            return
         elif qs == retrial1:
             await async_redis_wrapper(set_hash_set,tid,qid,retrial2)
             await asyncio.create_task(main_task(banner,tid,qid,retrial2))
+            return
         else:
             await async_redis_wrapper(set_hash_set,tid,qid,failed)
             ## Retrial 2 failed
             await async_redis_wrapper(decr_redis_key,banner+current_executing_suffix)
     finally:
+        await async_redis_wrapper(incr_redis_key,f"{tid}_pending_counter")
         await start_pending_task(banner,tid)
 
         
 
 ## Task to be executed asynchronously
 async def executing_task(tid:str,qid:str):
+    # generate a random number between 60 and 100
+    random_execution_time = random.randint(10, 60)  
+    # if a number is even then execute else raise an exception
+    if random_execution_time <= 20:
         await asyncio.sleep(10)
+    else:
+        raise Exception("Random execution time is odd, we need even !.")
 
 ## Start a Pending Task, which is blocked due to rate limiting
 async def start_pending_task(banner:str,tid:str):
@@ -137,7 +150,8 @@ async def start_pending_task(banner:str,tid:str):
         print(f"Acquired Lock : {tid+lock_suffix}")
     else:
         print(f"Failed to acquire lock : {tid+lock_suffix}")
-        return "Failed to acquire lock"
+        await start_pending_task(banner,tid) ## Mandatory Retrial
+        return
     
     ## Fetch the First Pending Query Id
     qid = await fetch_first_pending_task(tid)
