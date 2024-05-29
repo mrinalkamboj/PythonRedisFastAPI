@@ -134,15 +134,18 @@ async def main_task(banner:str,tid:str,qid:str,status):
         if qs == executing:        
             await asyncio.create_task(main_task(banner,tid,qid,retrial1))
             return
+            return
         elif qs == retrial1:
             await async_redis_wrapper(set_hash_set,tid,qid,retrial2)
             await asyncio.create_task(main_task(banner,tid,qid,retrial2))
+            return
             return
         else:
             await async_redis_wrapper(set_hash_set,tid,qid,failed)
             ## Retrial 2 failed
             await async_redis_wrapper(decr_redis_key,f"{tid}{current_executing_suffix}")
     finally:
+        await async_redis_wrapper(incr_redis_key,f"{tid}_pending_counter")
         await start_pending_task(banner,tid)
 
         
@@ -168,6 +171,8 @@ async def start_pending_task(banner:str,tid:str):
         print(f"Acquired Lock : {tid+lock_suffix}")
     else:
         print(f"Failed to acquire lock : {tid+lock_suffix}")
+        await start_pending_task(banner,tid) ## Mandatory Retrial
+        return
         await start_pending_task(banner,tid) ## Mandatory Retrial
         return
     

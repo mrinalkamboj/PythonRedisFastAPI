@@ -19,9 +19,11 @@ print(str(hs[b"a"]))
 '''
 
 '''
+'''
 retval = get_hash_set_keys("23c5f1dd-fe30-441e-a9dc-95c6fa6e6b72",["1","2","3"])
 for i in retval:
     print(str(i.decode('utf-8')))
+'''
 '''
 
 '''
