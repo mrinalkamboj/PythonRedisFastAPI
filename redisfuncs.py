@@ -1,5 +1,5 @@
 ## import constants
-from const import redis_host, redis_port,redis_nodes,pending,executing,success,failed,retrial1,retrial2,starting,lock_suffix,rate_limit_suffix,valid_suffix,redis_lock_ttl_ms
+from const import redis_host, redis_port,redis_nodes,pending,executing,success,failed,retrial1,retrial2,starting,lock_suffix,rate_limit_suffix,valid_suffix,redis_lock_ttl_ms,const_true,const_false
 
 ## import uuid
 import uuid
@@ -58,6 +58,13 @@ def set_redis_keys(key_values:dict):
     for key,value in key_values.items():
         r.set(key,value)
     r.close()
+
+## Execute a redis command
+def execute_redis_command(command:str):
+    r = redis.Redis(host=redis_host, port=redis_port)
+    retval =  r.execute_command(command)
+    r.close()
+    return retval
 
 ## Increment a redis key
 def incr_redis_key(key:str):
@@ -161,7 +168,7 @@ def generate_unique_tracking_id():
 
     while True:        
         if not is_redis_key(unique_id+valid_suffix):
-            set_redis_key(unique_id+valid_suffix,"True")
+            set_redis_key(unique_id+valid_suffix,const_true)
             break
         else:
             isused = get_redis_key(unique_id+valid_suffix)
@@ -169,7 +176,7 @@ def generate_unique_tracking_id():
                 unique_id =  str(uuid.uuid4())
                 continue
             else:
-                set_redis_key(unique_id+valid_suffix,True)
+                set_redis_key(unique_id+valid_suffix,const_false)
                 break
     
     return unique_id

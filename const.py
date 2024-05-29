@@ -16,8 +16,12 @@ redis_lock_ttl_ms = 10000
 ## Suffix for appending to the few Redis Variables
 valid_suffix = "_valid"
 lock_suffix = "_lock"
+pending_suffix = "_pending"
 rate_limit_suffix = "_rate_limit"
 current_executing_suffix = "_current_executing"
+all_banners_default_rate_limit = 7
+const_true = "True"
+const_false = "False"
 
 ## Query executing status
 starting = "starting"

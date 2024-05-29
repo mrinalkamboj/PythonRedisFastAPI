@@ -1,6 +1,13 @@
-from redisfuncs import set_redis_key, get_redis_key, list_redis_keys, delete_redis_key, delete_all_redis_keys, acquire_redis_lock, release_redis_lock, incr_redis_key, decr_redis_key,async_redis_wrapper,set_redis_keys,generate_unique_tracking_id, get_hash_set,get_hash_set_keys,set_hash_set,set_hash_set_keys
+from redisfuncs import set_redis_key, get_redis_key, list_redis_keys, delete_redis_key, delete_all_redis_keys, acquire_redis_lock, release_redis_lock, incr_redis_key, decr_redis_key,async_redis_wrapper,set_redis_keys,generate_unique_tracking_id, get_hash_set,get_hash_set_keys,set_hash_set,set_hash_set_keys,execute_redis_command
 
 from const import lock_suffix,pending,executing,success,failed,retrial1,retrial2,starting
+
+ret  = execute_redis_command("set test-key test-value")
+print(ret)
+ret = execute_redis_command("get test-key")
+print(ret)
+ret = execute_redis_command("hmset hash_name 'key1' 'value1' 'key2' 'value2' 'key3' 'value3'")
+print(ret)
 
 '''
 set_hash_set_keys("test-hash",{"a":"1","b":"2","c":"3"})
@@ -11,10 +18,11 @@ for i,v in hs.items():
 print(str(hs[b"a"]))
 '''
 
+'''
 retval = get_hash_set_keys("23c5f1dd-fe30-441e-a9dc-95c6fa6e6b72",["1","2","3"])
 for i in retval:
     print(str(i.decode('utf-8')))
-
+'''
 
 '''
 if(get_redis_key("test-key") == None):
