@@ -163,22 +163,22 @@ def set_hash_set_keys(hash_name:str,key_values:dict):
 ## Generate a unique tracking id
 def generate_unique_tracking_id():
 
-    # Generate a unique id
+    # Generate a unique id (this is the tracking id for the save and finalise operation)
     unique_id =  str(uuid.uuid4())
 
-    while True:        
-        if not is_redis_key(unique_id+valid_suffix):
-            set_redis_key(unique_id+valid_suffix,const_true)
-            break
-        else:
-            isused = get_redis_key(unique_id+valid_suffix)
+    # Inifnite loop to ensure that tracking id is always unique
+    while True:      
+        # Check if the tracking id is not in redis, then its a valid id, add it and continue  
+        if not is_redis_key(f"{unique_id}{valid_suffix}"):
+            set_redis_key(f"{unique_id}{valid_suffix}",const_true)
+            break ## break the loop
+        else: # if tracking id exists then regenarate the tracking id and continue the loop
+            isused = get_redis_key(f"{unique_id}{valid_suffix}")
             if isused:
                 unique_id =  str(uuid.uuid4())
                 continue
-            else:
-                set_redis_key(unique_id+valid_suffix,const_false)
-                break
+            break ## break the loop
     
-    return unique_id
+    return unique_id ## return the unique tracking id
     
 

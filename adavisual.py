@@ -26,6 +26,9 @@ async def entry(key:str,value:str):
     await async_redis_wrapper(set_redis_key, key, value)
     return await async_redis_wrapper(get_redis_key, key)
 
+'''
+Ada Visual Save and Finalise API
+'''
 @router.get("/sf")
 async def ada_visual_sf(banner:str,weeks:List[str]=Query(None)):
     ## Execution Begin Time
@@ -34,8 +37,9 @@ async def ada_visual_sf(banner:str,weeks:List[str]=Query(None)):
     tid = await async_redis_wrapper(generate_unique_tracking_id)
     print(f"Tracking Id : {tid}")
 
-    ## For a given tracking id, set the status of each week as "starting"
+    ## For a given tracking id, set the status of each week as "starting" (this is initial status for all queries)
     week_tracking_dict = {w:starting for w in weeks}
+    ## Create a redis hashset trackinbg every query execution status
     await async_redis_wrapper(set_hash_set_keys,tid,week_tracking_dict)
     
     ## Segregate and Generate Query Ids
@@ -47,11 +51,11 @@ async def ada_visual_sf(banner:str,weeks:List[str]=Query(None)):
     end = dt.now()
     elapsed  = end - start
     elapsed_seconds = int(elapsed.total_seconds())
-    print(f"*************************")
+    print(f"**************************************")
     print(f"Start Time : {start.strftime('%H:%M:%S')}")
     print(f"End Time : {end.strftime('%H:%M:%S')}")
     print(f"Elapsed Time : {elapsed_seconds}")
-    print(f"*************************")
+    print(f"***************************************")
 
 ## Async Function to execute the Save and Finalise operation
 async def ada_visual_sf_execute(banner:str,tid:str,qid:str,status=starting):
@@ -59,7 +63,7 @@ async def ada_visual_sf_execute(banner:str,tid:str,qid:str,status=starting):
     ## Acquire the distributed lock using redis
     print("Acquiring Redis Lock !!")
 
-    lock  = await async_redis_wrapper(acquire_redis_lock, banner+lock_suffix,redis_lock_ttl_ms)
+    lock  = await async_redis_wrapper(acquire_redis_lock, f"{banner}{lock_suffix}",redis_lock_ttl_ms)
 
     ## Check whether the valid lock is acquired
     if lock:
@@ -76,16 +80,16 @@ async def ada_visual_sf_execute(banner:str,tid:str,qid:str,status=starting):
     if not rate_limit:
         rate_limit = all_banners_default_rate_limit
 
-    current_executing = await async_redis_wrapper(get_redis_key,f"{tid}{current_executing_suffix}")
+    current_executing = await async_redis_wrapper(get_redis_key,f"{banner}{current_executing_suffix}")
 
     query_status =  None
 
     if not current_executing:
-        await async_redis_wrapper(set_redis_key,f"{tid}{current_executing_suffix}",0)
+        await async_redis_wrapper(set_redis_key,f"{banner}{current_executing_suffix}",0)
         ## Being the first query set the status of Executing and Proceed
         query_status = executing
     else:
-        current_executing = await async_redis_wrapper(incr_redis_key,f"{tid}{current_executing_suffix}")
+        current_executing = await async_redis_wrapper(incr_redis_key,f"{banner}{current_executing_suffix}")
 
         if int(current_executing) < int(rate_limit):
             query_status = executing
@@ -124,7 +128,7 @@ async def main_task(banner:str,tid:str,qid:str,status):
         await executing_task(tid,qid)
         ## Set the status of the query for a transaction id as "success"
         await async_redis_wrapper(set_hash_set,tid,qid,success)
-        await async_redis_wrapper(decr_redis_key,f"{tid}{current_executing_suffix}")
+        await async_redis_wrapper(decr_redis_key,f"{banner}{current_executing_suffix}")
     except Exception as e:
         print(f"Error in Query : {qid} : {e}")
         ## Fetch the Query Status for a Transaction Id and Initiate Retrial based on the status
@@ -134,18 +138,16 @@ async def main_task(banner:str,tid:str,qid:str,status):
         if qs == executing:        
             await asyncio.create_task(main_task(banner,tid,qid,retrial1))
             return
-            return
         elif qs == retrial1:
             await async_redis_wrapper(set_hash_set,tid,qid,retrial2)
             await asyncio.create_task(main_task(banner,tid,qid,retrial2))
             return
-            return
         else:
             await async_redis_wrapper(set_hash_set,tid,qid,failed)
             ## Retrial 2 failed
-            await async_redis_wrapper(decr_redis_key,f"{tid}{current_executing_suffix}")
+            await async_redis_wrapper(decr_redis_key,f"{banner}{current_executing_suffix}")
     finally:
-        await async_redis_wrapper(incr_redis_key,f"{tid}_pending_counter")
+        ## await async_redis_wrapper(incr_redis_key,f"{tid}{pending_suffix}")
         await start_pending_task(banner,tid)
 
         
@@ -171,8 +173,6 @@ async def start_pending_task(banner:str,tid:str):
         print(f"Acquired Lock : {tid+lock_suffix}")
     else:
         print(f"Failed to acquire lock : {tid+lock_suffix}")
-        await start_pending_task(banner,tid) ## Mandatory Retrial
-        return
         await start_pending_task(banner,tid) ## Mandatory Retrial
         return
     
